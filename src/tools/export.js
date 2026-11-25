@@ -4,6 +4,7 @@ import { runDSP } from '../dsp/client.js';
 import { dialog, h, segmented, progressDlg, download, toast } from '../ui/dom.js';
 import { projectDuration } from '../core/project.js';
 import { peakOf } from '../core/pcm.js';
+import { zip } from '../export/zip.js';
 
 export const FORMATS = [
   { value: 'mp3', label: 'MP3', mime: 'audio/mpeg' },
@@ -58,5 +59,24 @@ export function setupExport(app) {
   };
   app.tab('export', 'تصدير', () => [
     { icon: 'Download', label: 'تصدير', id: 'export' },
+    { icon: 'Layers', label: 'كل مسار منفصلًا', id: 'exportStems' },
   ], 90);
+  setupStems(app);
+}
+
+export function setupStems(app) {
+  app.actions.exportStems = async (opts = {}) => {
+    const p = app.project; const tracks = p.tracks.filter((t) => t.clips.length);
+    if (!tracks.length) return toast('لا توجد مسارات فيها صوت');
+    let fmt = opts.format || 'wav';
+    if (!opts.auto) { const ok = await dialog({ title: 'تصدير كل مسار منفصلًا', body: h('div', {}, h('p', { class: 'note' }, `سيُحفظ ${tracks.length} ملف (ملف لكل مسار) داخل ملف مضغوط واحد ZIP، كلها بطول المشروع حتى تتطابق عند جمعها في برنامج آخر.`), segmented(FORMATS.map((f) => ({ value: f.value, label: f.label })), fmt, (v) => (fmt = v))), actions: [{ label: 'إلغاء', value: false }, { label: 'صدّر', value: true, primary: true }] }); if (!ok) return; }
+    const files = [];
+    for (const [i, t] of tracks.entries()) {
+      const out = await app.actions.export({ returnBytes: true, auto: true, format: fmt, trackFilter: (x) => x.id === t.id, name: `${i + 1} - ${safeName(t.name)}` });
+      if (out) files.push({ name: out.file, data: out.bytes });
+    }
+    // one ZIP file: browsers block several automatic downloads in a row
+    download(zip(files), `${safeName(p.name)} - المسارات.zip`, 'application/zip');
+    toast(`صُدّر ${files.length} مسار منفصلًا في ملف مضغوط واحد`);
+  };
 }

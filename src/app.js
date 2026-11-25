@@ -1,5 +1,5 @@
 // Shared application context used by all tool modules.
-import { state, commit, emit, addSource, getSource, onChange } from './storage/store.js';
+import { state, commit, emit, addSource, getSource, onChange, undo } from './storage/store.js';
 import { Player, decodeFile, renderProject } from './audio/engine.js';
 import { activeTrack, trackEnd, replaceRange, projectDuration, findClip, clipEnd, shiftMarkers } from './core/project.js';
 import { renderTrack } from './core/mix.js';
@@ -50,6 +50,7 @@ export const app = {
   },
   decodeFile, projectDuration: () => projectDuration(state.project),
   renderMixdown(opts = {}) { return renderProject(state.project, getSource, opts); },
+  undoSilent() { undo(); state.redo.pop(); },
   stopPlayback() { this.player.stop(); },
 };
 window.sada = app; // handy for debugging & automated browser tests

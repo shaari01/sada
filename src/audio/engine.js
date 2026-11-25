@@ -29,8 +29,7 @@ function curve(param, values, when, dur) {
 export function buildGraph(c, project, getSource, t0, t1, dest, when, { trackFilter = null, isOffline = false } = {}) {
   const nodes = [];
   const dur = t1 - t0;
-  for (const tr of audibleTracks(project)) {
-    if (trackFilter && !trackFilter(tr)) continue;
+  for (const tr of trackFilter ? project.tracks.filter(trackFilter) : audibleTracks(project)) {
     const tg = c.createGain(); nodes.push(tg);
     const env = sampleEnv(tr.envelope, t0, t1, isOffline ? 400 : 100);
     for (let i = 0; i < env.length; i++) env[i] *= tr.volume;
