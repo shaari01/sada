@@ -69,11 +69,6 @@ export class Timeline {
     tracks.forEach((tr, li) => {
       const y0 = li * this.laneH, lh = this.laneH;
       c.fillStyle = tr.id === p.activeTrackId && this.mode === 'multi' ? laneAlt : laneBg; c.fillRect(0, y0, W, lh);
-      // beat grid
-      if (p.grid && p.bpm) {
-        const beat = 60 / p.bpm; const t0 = Math.max(p.beatOffset, p.beatOffset + Math.floor((this.scroll - p.beatOffset) / beat) * beat);
-        if (beat * this.pps > 6) for (let t = t0, k = Math.round((t0 - p.beatOffset) / beat); t < this.timeAt(W); t += beat, k++) { const x = Math.round(this.xAt(t)) + 0.5; c.strokeStyle = k % 4 === 0 ? css('--grid-strong') : css('--grid'); c.lineWidth = 1; c.beginPath(); c.moveTo(x, y0); c.lineTo(x, y0 + lh); c.stroke(); }
-      }
       for (const cl of tr.clips) {
         const x0 = this.xAt(cl.start), x1 = this.xAt(clipEnd(cl));
         if (x1 < 0 || x0 > W) continue;
@@ -95,6 +90,11 @@ export class Timeline {
         c.strokeStyle = css('--fade'); c.lineWidth = 2;
         if (cl.fadeIn > 0) { c.beginPath(); c.moveTo(x0, y0 + lh - 4); c.lineTo(this.xAt(cl.start + cl.fadeIn), y0 + 4); c.stroke(); }
         if (cl.fadeOut > 0) { c.beginPath(); c.moveTo(this.xAt(clipEnd(cl) - cl.fadeOut), y0 + 4); c.lineTo(x1, y0 + lh - 4); c.stroke(); }
+      }
+      // beat grid
+      if (p.grid && p.bpm) {
+        const beat = 60 / p.bpm; const t0 = Math.max(p.beatOffset, p.beatOffset + Math.floor((this.scroll - p.beatOffset) / beat) * beat);
+        if (beat * this.pps > 6) for (let t = t0, k = Math.round((t0 - p.beatOffset) / beat); t < this.timeAt(W); t += beat, k++) { const x = Math.round(this.xAt(t)) + 0.5; c.strokeStyle = k % 4 === 0 ? css('--grid-strong') : css('--grid'); c.lineWidth = 1; c.beginPath(); c.moveTo(x, y0); c.lineTo(x, y0 + lh); c.stroke(); }
       }
       // envelope
       if (tr.envelope.length || this.tool === 'envelope') {
