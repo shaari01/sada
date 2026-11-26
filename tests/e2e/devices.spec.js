@@ -10,7 +10,7 @@ for (const [name, dev] of [['phone', devices['Galaxy S9+']], ['tablet', devices[
       // no horizontal page overflow; toolbar buttons are big enough to touch
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1 && window.innerWidth === screen.width)).toBe(true);
       expect(await page.evaluate(() => document.querySelector('.tl-ruler').getBoundingClientRect().width <= window.innerWidth)).toBe(true);
-      const b = await page.locator('#toolbar .tbtn').first().boundingBox(); expect(b.width).toBeGreaterThanOrEqual(64); expect(b.height).toBeGreaterThanOrEqual(64);
+      const b = await page.locator('#toolbar .tbtn').first().boundingBox(); expect(b.width).toBeGreaterThanOrEqual(48); expect(b.height).toBeGreaterThanOrEqual(48); expect(b.height).toBeLessThanOrEqual(64);
       // touch-drag selection then cut via tap
       const box = await page.getByTestId('wave').boundingBox(); const y = box.y + box.height / 2;
       await page.touchscreen.tap(box.x + box.width * 0.2, y);
@@ -19,6 +19,14 @@ for (const [name, dev] of [['phone', devices['Galaxy S9+']], ['tablet', devices[
       await tool(page, 'cut');
       expect(await page.evaluate(() => window.sada.projectDuration())).toBeLessThan(5.5);
       await page.screenshot({ path: `test-results/dev-${name}.png` });
+      // touch-safe sliders: tapping the track or swiping across it must not change the value; dragging the thumb does
+      await page.locator('#tabs [data-tab="fx"]').click(); await tool(page, 'amplify');
+      const tr = page.locator('dialog .sr-track').first(); const tb = await tr.boundingBox();
+      const before = await page.locator('dialog .sr-val').first().textContent();
+      await page.touchscreen.tap(tb.x + tb.width * 0.95, tb.y + tb.height / 2);
+      expect(await page.locator('dialog .sr-val').first().textContent()).toBe(before);
+      await page.screenshot({ path: `test-results/dev-${name}-dialog.png` });
+      await page.locator('dialog header button').click();
       await page.locator('#viewSwitch [data-view="multi"]').click();
       await page.screenshot({ path: `test-results/dev-${name}-multi.png` });
       expect(errors).toEqual([]);

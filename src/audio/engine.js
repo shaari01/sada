@@ -75,14 +75,15 @@ export class Player {
     this._raf();
     this.emit();
   }
-  playPCM(pcm, onEnd) {
+  playPCM(pcm, onEnd, { loop = false, offset = 0 } = {}) {
     this.stop(true); const c = audioCtx();
-    const s = c.createBufferSource(); s.buffer = toAudioBuffer(c, pcm); s.connect(c.destination); s.start();
-    this.nodes = [s]; this.playing = true; this.preview = true; this.startCtx = c.currentTime; this.from = 0; this.to = pcm.channels[0].length / pcm.sampleRate;
+    const s = c.createBufferSource(); s.buffer = toAudioBuffer(c, pcm); s.loop = loop; s.connect(c.destination); s.start(0, offset);
+    const dur = pcm.channels[0].length / pcm.sampleRate;
+    this.nodes = [s]; this.playing = true; this.preview = true; this.startCtx = c.currentTime - offset; this.from = 0; this.to = loop ? Infinity : dur; this.previewDur = dur;
     s.onended = () => { if (this.nodes[0] === s) { this.stop(); onEnd?.(); } };
     this.emit();
   }
-  position() { if (!this.playing) return null; return this.from + Math.max(0, audioCtx().currentTime - this.startCtx); }
+  position() { if (!this.playing) return null; const p = this.from + Math.max(0, audioCtx().currentTime - this.startCtx); return this.preview && this.previewDur ? p % this.previewDur : p; }
   _raf() {
     cancelAnimationFrame(this.raf);
     const tick = () => {

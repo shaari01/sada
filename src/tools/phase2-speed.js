@@ -2,6 +2,7 @@
 import { runDSP } from '../dsp/client.js';
 import { dialog, h, slider, segmented, toast } from '../ui/dom.js';
 import { curveEditor } from '../ui/curve.js';
+import { livePreview } from '../ui/preview.js';
 import { shape } from '../core/envelope.js';
 import { slicePCM } from '../core/pcm.js';
 
@@ -47,15 +48,10 @@ export function setup(app) {
       return { speed: 1, points: speedPoints(mode, { from: from.get(), to: to.get(), shape: shp, curve: curve.get() }), semitones: 0 };
     };
     const info = h('p', { class: 'note' }, `النطاق: ${r.kind === 'selection' ? 'الجزء المحدد' : r.kind === 'clip' ? 'المقطع المحدد' : 'المسار كاملًا'} (${(r.b - r.a).toFixed(2)} ث)`);
-    const res = await dialog({
-      title: 'السرعة والطبقة', wide: true, body: h('div', {}, modeSeg, holder, info),
-      actions: [
-        { label: 'إلغاء', value: null },
-        { label: 'معاينة', value: null, onClick: async (d) => { const btn = d.querySelector('[data-value="null"]:nth-of-type(2)'); const pcm = app.renderRange(r.a, Math.min(r.b, r.a + 10)); const out = await applySpeedPitch(pcm, params()); app.player.playPCM(out); return false; } },
-        { label: 'طبّق', value: () => params(), primary: true },
-      ],
-    });
-    app.player.stop();
+    const pv = livePreview(app, { range: r, process: (pcm) => applySpeedPitch(pcm, params()) });
+    const body = h('div', {}, modeSeg, holder, info, pv);
+    const res = await dialog({ title: 'السرعة والطبقة', wide: true, body, onOpen: () => pv.attach(body), actions: [{ label: 'إلغاء', value: null }, { label: 'اعتماد', value: () => params(), primary: true }] });
+    pv.stop();
     if (!res) return;
     const label = mode === 'pitch' ? 'تغيير الطبقة' : mode === 'fixed' ? 'تغيير السرعة' : 'سرعة تدريجية';
     await app.processRange(label, (pcm, onP) => applySpeedPitch(pcm, res, onP), { range: r, progressTitle: label });

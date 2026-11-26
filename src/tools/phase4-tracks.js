@@ -1,7 +1,7 @@
 // المرحلة 4: المسارات المتعددة، والدمج، والتلاشي المتقاطع
 import { newTrack, getTrack, findClip, clipEnd, sortClips, TRACK_COLORS } from '../core/project.js';
 import { uid } from '../core/ids.js';
-import { h, dialog, promptDlg, confirmDlg, toast, slider } from '../ui/dom.js';
+import { h, dialog, promptDlg, confirmDlg, toast, slider, safeRange } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 
 /** crossfade clip with the next clip on the same track (overlap them by `len` seconds). */
@@ -57,16 +57,14 @@ export function setup(app) {
       let before = null;
       const snap = () => { if (!before) before = { volume: t.volume, pan: t.pan }; };
       const commitLive = (label, key) => { const v = t[key]; if (before) t[key] = before[key]; before = null; app.commit(label, (pp) => { getTrack(pp, t.id)[key] = v; }); };
-      const vol = h('input', { type: 'range', min: 0, max: 1.5, step: 0.01, value: t.volume, 'aria-label': 'مستوى المسار', oninput: (e) => { snap(); t.volume = +e.target.value; volOut.textContent = Math.round(t.volume * 100) + '%'; live(); }, onchange: () => commitLive('مستوى المسار', 'volume') });
-      const volOut = h('span', {}, Math.round(t.volume * 100) + '%');
-      const pan = h('input', { type: 'range', min: -1, max: 1, step: 0.05, value: t.pan, 'aria-label': 'يمين ويسار', oninput: (e) => { snap(); t.pan = +e.target.value; panOut.textContent = panLabel(t.pan); live(); }, onchange: () => commitLive('توزيع يمين/يسار', 'pan') });
-      const panOut = h('span', {}, panLabel(t.pan));
+      const vol = safeRange({ compact: true, label: 'مستوى المسار', min: 0, max: 1.5, step: 0.05, value: t.volume, fmt: (v) => Math.round(v * 100) + '%', onInput: (v) => { snap(); t.volume = v; live(); }, onChange: () => commitLive('مستوى المسار', 'volume') });
+      const pan = safeRange({ compact: true, label: 'يمين ويسار', min: -1, max: 1, step: 0.1, value: t.pan, fmt: panLabel, onInput: (v) => { snap(); t.pan = v; live(); }, onChange: () => commitLive('توزيع يمين/يسار', 'pan') });
       const row = h('div', { class: 'trk-h' + (t.id === p.activeTrackId ? ' active' : ''), style: { height: laneH + 'px' }, 'data-track': t.id, onclick: (e) => { if (e.target.closest('input,button')) return; app.timeline.onTrackActivate(t.id); } },
         h('div', { class: 'nm' }, h('span', { class: 'dot', style: { background: t.color } }), h('button', { type: 'button', class: 'tn', onclick: () => A.renameTrack(t.id) }, t.name),
           h('button', { type: 'button', class: 'ms m', 'aria-pressed': String(t.mute), title: 'كتم', onclick: () => { app.commit('كتم', (pp) => { const x = getTrack(pp, t.id); x.mute = !x.mute; }); live(); } }, 'كتم'),
           h('button', { type: 'button', class: 'ms s', 'aria-pressed': String(t.solo), title: 'عزف منفرد', onclick: () => { app.commit('منفرد', (pp) => { const x = getTrack(pp, t.id); x.solo = !x.solo; }); live(); } }, 'منفرد')),
-        h('label', { class: 'mini' }, icon('Volume2', 16), vol, volOut),
-        laneH > 100 ? h('label', { class: 'mini' }, icon('ArrowLeftRight', 16), pan, panOut) : null,
+        h('div', { class: 'mini' }, icon('Volume2', 14), vol),
+        laneH > 90 ? h('div', { class: 'mini' }, icon('ArrowLeftRight', 14), pan) : null,
       );
       root.append(row);
     }
@@ -82,4 +80,4 @@ export function setup(app) {
     { icon: 'X', label: 'حذف المسار', id: 'delTrack' },
   ], 40);
 }
-const panLabel = (v) => (Math.abs(v) < 0.03 ? 'وسط' : v < 0 ? `يسار ${Math.round(-v * 100)}` : `يمين ${Math.round(v * 100)}`);
+const panLabel = (v) => (Math.abs(v) < 0.03 ? 'وسط' : `${v < 0 ? 'يسار' : 'يمين'} ${Math.round(Math.abs(v) * 100)}`);

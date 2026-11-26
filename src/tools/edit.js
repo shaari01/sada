@@ -1,6 +1,8 @@
 import { getTrack, copyRange, deleteRange, insertAt, insertSilence, splitAt, trackEnd, shiftMarkers, projectDuration } from '../core/project.js';
 import { uid } from '../core/ids.js';
 import { promptDlg, dialog, h, slider, toast, confirmDlg } from '../ui/dom.js';
+import { livePreview } from '../ui/preview.js';
+import { renderTrack } from '../core/mix.js';
 
 export const MARKER_PRESETS = ['بداية المقطع', 'المذهب', 'الكوبليه', 'اللازمة', 'الختام', 'بداية الغناء'];
 
@@ -18,7 +20,12 @@ export function setupEdit(app) {
   A.shorten = async () => {
     const s = needSel(); if (!s) return;
     const sl = slider({ label: 'طول التلاشي', min: 10, max: 500, step: 10, value: 80, fmt: (v) => v + ' م.ث' });
-    const ok = await dialog({ title: 'تقصير بتلاشٍ متقاطع', body: h('div', {}, h('p', { class: 'note' }, `سيُحذف الجزء المحدد (${(s[1] - s[0]).toFixed(2)} ث) ويُوصل ما قبله بما بعده بتلاشٍ متقاطع حتى لا يُسمع القطع.`), sl), actions: [{ label: 'إلغاء', value: false }, { label: 'قصّر', value: true, primary: true }] });
+    const pa = Math.max(0, s[0] - 3);
+    const pv = livePreview(app, { range: { a: pa, b: s[0] + 3 }, source: async () => ({ sampleRate: 1, channels: [new Float32Array(1)] }),
+      process: () => { const t = structuredClone(app.track); deleteRange(t, s[0], s[1], { crossfade: sl.get() / 1000 }); return renderTrack(t, pa, Math.min(trackEnd(t), s[0] + 3), app.getSource, state.project.sampleRate); } });
+    const body = h('div', {}, h('p', { class: 'note' }, `سيُحذف الجزء المحدد (${(s[1] - s[0]).toFixed(2)} ث) ويُوصل ما قبله بما بعده بتلاشٍ متقاطع حتى لا يُسمع القطع. المعاينة تُسمعك 3 ثوانٍ قبل الوصلة و3 بعدها.`), sl, pv);
+    const ok = await dialog({ title: 'تقصير بتلاشٍ متقاطع', body, onOpen: () => pv.attach(body), actions: [{ label: 'إلغاء', value: false }, { label: 'اعتماد', value: true, primary: true }] });
+    pv.stop();
     if (!ok) return;
     op('تقصير', (p, t) => { deleteRange(t, s[0], s[1], { crossfade: sl.get() / 1000 }); if (single(p)) shiftMarkers(p, s[1], -(s[1] - s[0]), s[0], s[1]); });
     state.selection = null; state.cursor = s[0]; app.emit('selection');

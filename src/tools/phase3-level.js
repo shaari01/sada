@@ -4,6 +4,7 @@ import { getTrack, trackEnd } from '../core/project.js';
 import { mixdownMono } from '../core/pcm.js';
 import { voiceActivity, duckEnvelope } from '../core/duck.js';
 import { dialog, h, slider, segmented, toast, confirmDlg } from '../ui/dom.js';
+import { livePreview } from '../ui/preview.js';
 
 const SHAPES = [{ value: 'linear', label: 'خطي' }, { value: 'smooth', label: 'ناعم' }, { value: 'fast', label: 'سريع ثم بطيء' }, { value: 'slow', label: 'بطيء ثم سريع' }];
 export function bakeFade(pcm, kind, curve = 'linear') {
@@ -27,7 +28,13 @@ export function setup(app) {
       h('button', { type: 'button', class: 'chip', onclick: () => { from.set(100); to.set(50); } }, 'إلى النصف'),
       h('button', { type: 'button', class: 'chip', onclick: () => { from.set(30); to.set(100); } }, 'عودة إلى 100%'));
     const body = h('div', {}, h('p', { class: 'note' }, r ? `يتدرج مستوى الصوت خلال الجزء المحدد (${(r.b - r.a).toFixed(2)} ث) ثم يبقى على المستوى الجديد.` : 'يبدأ التدرج من المؤشر خلال المدة التي تختارها، ثم يبقى الصوت على المستوى الجديد.'), r ? null : durSl, from, to, chips, h('p', {}, 'شكل التدرج'), seg);
-    const ok = await dialog({ title: 'التدرج إلى مستوى محدد', body, actions: [{ label: 'إلغاء', value: false }, { label: 'طبّق', value: true, primary: true }] });
+    const span = () => (r ? [r.a, r.b] : [state.cursor, state.cursor + durSl.get()]);
+    const pa = Math.max(0, (r ? r.a : state.cursor) - 1.5);
+    const pv = livePreview(app, { range: { a: pa, b: pa + 15 }, maxSec: 15, source: async () => app.renderRange(pa, Math.min(trackEnd(tr), pa + 15)),
+      process: (pcm) => { const [a, b] = span(); const env = applyRamp(tr.envelope, a, b, from.get() / 100, to.get() / 100, shp); const sr = pcm.sampleRate; for (const ch of pcm.channels) for (let i = 0; i < ch.length; i++) ch[i] *= envValueAt(env, pa + i / sr); return pcm; } });
+    body.append(pv);
+    const ok = await dialog({ title: 'التدرج إلى مستوى محدد', body, onOpen: () => pv.attach(body), actions: [{ label: 'إلغاء', value: false }, { label: 'اعتماد', value: true, primary: true }] });
+    pv.stop();
     if (!ok) return;
     const a = r ? r.a : state.cursor, b = r ? r.b : state.cursor + durSl.get();
     const tid = tr.id;
@@ -39,7 +46,10 @@ export function setup(app) {
     let rr = r;
     if (r.kind !== 'selection') { const d = Math.min(3, (r.b - r.a) / 2); rr = kind === 'in' ? { a: r.a, b: r.a + d, kind: 'selection' } : { a: r.b - d, b: r.b, kind: 'selection' }; }
     let shp = 'linear'; const seg = segmented(SHAPES, shp, (v) => (shp = v));
-    const ok = await dialog({ title: kind === 'in' ? 'تلاشٍ عند البداية (Fade In)' : 'تلاشٍ عند النهاية (Fade Out)', body: h('div', {}, h('p', { class: 'note' }, `${kind === 'in' ? 'يبدأ الصوت من الصمت ويرتفع' : 'ينخفض الصوت حتى الصمت'} خلال ${(rr.b - rr.a).toFixed(2)} ث${r.kind !== 'selection' ? ' (حدّد جزءًا لتغيير المدة)' : ''}.`), seg), actions: [{ label: 'إلغاء', value: false }, { label: 'طبّق', value: true, primary: true }] });
+    const pv = livePreview(app, { range: rr, process: (pcm) => bakeFade(pcm, kind, shp) });
+    const body = h('div', {}, h('p', { class: 'note' }, `${kind === 'in' ? 'يبدأ الصوت من الصمت ويرتفع' : 'ينخفض الصوت حتى الصمت'} خلال ${(rr.b - rr.a).toFixed(2)} ث${r.kind !== 'selection' ? ' (حدّد جزءًا لتغيير المدة)' : ''}.`), seg, pv);
+    const ok = await dialog({ title: kind === 'in' ? 'تلاشٍ عند البداية (Fade In)' : 'تلاشٍ عند النهاية (Fade Out)', body, onOpen: () => pv.attach(body), actions: [{ label: 'إلغاء', value: false }, { label: 'اعتماد', value: true, primary: true }] });
+    pv.stop();
     if (!ok) return;
     await app.processRange(kind === 'in' ? 'تلاشي دخول' : 'تلاشي خروج', async (pcm) => bakeFade(pcm, kind, shp), { range: rr });
   }

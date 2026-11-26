@@ -4,6 +4,7 @@ import { keyShift, NOTE_NAMES_AR } from '../dsp/analysis.js';
 import { getTrack, trackEnd, findClip, clipEnd } from '../core/project.js';
 import { mixdownMono } from '../core/pcm.js';
 import { dialog, h, slider, toast, progressDlg } from '../ui/dom.js';
+import { livePreview } from '../ui/preview.js';
 
 /** pick the stretch ratio closest to 1 among tempo multiples (half/double time) */
 export function tempoRatio(target, source) {
@@ -45,7 +46,10 @@ export function setup(app) {
     const pg = progressDlg('قياس إيقاع المقطع'); let an; try { an = await analyse(r.track, r.a, r.b); } finally { pg.close(); }
     if (!an.bpm) return toast('المقطع قصير جدًا لقياس إيقاعه', 'error');
     const ratio = tempoRatio(p.bpm, an.bpm.bpm);
-    const ok = await dialog({ title: 'مطابقة السرعة', body: h('div', {}, h('p', {}, `إيقاع المقطع: ${an.bpm.bpm.toFixed(1)} — إيقاع الأغنية: ${p.bpm.toFixed(1)}`), h('p', {}, `سيتغير سرعة المقطع إلى ${ratio.toFixed(3)}× دون تغيير طبقته.`)), actions: [{ label: 'إلغاء', value: false }, { label: 'طابق', value: true, primary: true }] });
+    const pv = livePreview(app, { range: r, process: (pcm) => app.applySpeedPitch(pcm, { speed: ratio }) });
+    const body = h('div', {}, h('p', {}, `إيقاع المقطع: ${an.bpm.bpm.toFixed(1)} — إيقاع الأغنية: ${p.bpm.toFixed(1)}`), h('p', {}, `ستتغير سرعة المقطع إلى ${ratio.toFixed(3)}× دون تغيير طبقته.`), pv);
+    const ok = await dialog({ title: 'مطابقة السرعة', body, onOpen: () => pv.attach(body), actions: [{ label: 'إلغاء', value: false }, { label: 'اعتماد', value: true, primary: true }] });
+    pv.stop();
     if (!ok) return;
     await app.processRange('مطابقة السرعة', (pcm, onP) => app.applySpeedPitch(pcm, { speed: ratio }, onP), { range: r, progressTitle: 'مطابقة السرعة' });
   };
@@ -55,7 +59,9 @@ export function setup(app) {
     const pg = progressDlg('قياس مقام المقطع'); let an; try { an = await analyse(r.track, r.a, r.b); } finally { pg.close(); }
     const semis = keyShift(an.key, p.key);
     if (!semis) return toast(`المقطع على المقام نفسه (${keyName(an.key)})`);
-    const ok = await dialog({ title: 'مطابقة الطبقة (المقام)', body: h('div', {}, h('p', {}, `مقام المقطع: ${keyName(an.key)} — مقام الأغنية: ${keyName(p.key)}`), h('p', {}, `سيُنقل المقطع ${semis > 0 ? '+' : ''}${semis} نصف نغمة دون تغيير سرعته.`), h('p', { class: 'note' }, 'كشف المقام تقريبي، خاصة في المقامات الشرقية ذات أرباع النغمات؛ استمع بعد التطبيق وتراجع إن لم يناسب.')), actions: [{ label: 'إلغاء', value: false }, { label: 'طابق', value: true, primary: true }] });
+    const pv = livePreview(app, { range: r, process: (pcm) => app.applySpeedPitch(pcm, { speed: 1, semitones: semis }) });
+    const ok = await dialog({ onOpen: (d) => pv.attach(d), title: 'مطابقة الطبقة (المقام)', body: h('div', {}, pv, h('p', {}, `مقام المقطع: ${keyName(an.key)} — مقام الأغنية: ${keyName(p.key)}`), h('p', {}, `سيُنقل المقطع ${semis > 0 ? '+' : ''}${semis} نصف نغمة دون تغيير سرعته.`), h('p', { class: 'note' }, 'كشف المقام تقريبي، خاصة في المقامات الشرقية ذات أرباع النغمات؛ استمع للمعاينة قبل الاعتماد.')), actions: [{ label: 'إلغاء', value: false }, { label: 'اعتماد', value: true, primary: true }] });
+    pv.stop();
     if (!ok) return;
     await app.processRange('مطابقة الطبقة', (pcm, onP) => app.applySpeedPitch(pcm, { speed: 1, semitones: semis }, onP), { range: r, progressTitle: 'مطابقة الطبقة' });
   };

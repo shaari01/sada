@@ -14,7 +14,7 @@ export function h(tag, attrs = {}, ...kids) {
 }
 /** big touch button with icon + Arabic label */
 export function tbtn(iconName, label, onClick, extra = {}) {
-  return h('button', { class: 'tbtn ' + (extra.class || ''), type: 'button', title: extra.title || label, 'data-action': extra.id || null, onclick: onClick, 'aria-pressed': extra.pressed != null ? String(!!extra.pressed) : null }, icon(iconName, extra.size || 30), h('span', {}, label));
+  return h('button', { class: 'tbtn ' + (extra.class || ''), type: 'button', title: extra.title || label, 'data-action': extra.id || null, onclick: onClick, 'aria-pressed': extra.pressed != null ? String(!!extra.pressed) : null }, icon(iconName, extra.size || 22), h('span', {}, label));
 }
 export function fmtTime(t, precise = true) {
   if (t == null || !isFinite(t)) t = 0;
@@ -48,12 +48,43 @@ export async function promptDlg(title, value = '', presets = []) {
   const r = await dialog({ title, body, actions: [{ label: 'إلغاء', value: null }, { label: 'حفظ', value: () => inp.value.trim(), primary: true }], onOpen: () => { inp.focus(); inp.select(); } });
   return r;
 }
+/**
+ * Touch-safe slider: the value never jumps when the finger only passes over it.
+ * - vertical swipes scroll the page (touch-action: pan-y), they never change the value
+ * - a tap on the track does nothing; you must grab the thumb and drag sideways
+ * - − / + buttons for exact steps, and tapping the value lets you type it
+ */
+export function safeRange({ min, max, step = 1, value, fmt = (v) => v, onInput, onChange, label = '', compact = false }) {
+  min = +min; max = +max; step = +step;
+  const snapV = (v) => { const n = Math.round((v - min) / step) * step + min; return Math.min(max, Math.max(min, +n.toFixed(6))); };
+  let val = snapV(+value);
+  const fill = h('div', { class: 'sr-fill' }), thumb = h('div', { class: 'sr-thumb' });
+  const track = h('div', { class: 'sr-track', role: 'slider', tabindex: 0, 'aria-label': label, 'aria-valuemin': min, 'aria-valuemax': max }, h('div', { class: 'sr-rail' }, fill), thumb);
+  const out = h('button', { type: 'button', class: 'sr-val', title: 'اضغط لكتابة القيمة' });
+  const render = () => { const f = (val - min) / (max - min || 1); fill.style.width = f * 100 + '%'; thumb.style.left = `calc(${f * 100}% - 11px)`; out.textContent = fmt(val); track.setAttribute('aria-valuenow', val); track.setAttribute('aria-valuetext', fmt(val)); };
+  const setV = (v, fire = true) => { const nv = snapV(v); if (nv === val) return; val = nv; render(); if (fire) onInput?.(val); };
+  let drag = null;
+  track.addEventListener('pointerdown', (e) => {
+    const r = track.getBoundingClientRect(); const tx = r.left + ((val - min) / (max - min || 1)) * r.width;
+    if (Math.abs(e.clientX - tx) > (e.pointerType === 'mouse' ? 14 : 26)) return; // not on the thumb → ignore (no accidental jumps)
+    drag = { x0: e.clientX, v0: val, w: r.width, id: e.pointerId }; track.setPointerCapture(e.pointerId); track.classList.add('active');
+  });
+  track.addEventListener('pointermove', (e) => { if (!drag || e.pointerId !== drag.id) return; setV(drag.v0 + ((e.clientX - drag.x0) / drag.w) * (max - min)); });
+  const end = () => { if (!drag) return; drag = null; track.classList.remove('active'); onChange?.(val); };
+  track.addEventListener('pointerup', end); track.addEventListener('pointercancel', end); track.addEventListener('lostpointercapture', end);
+  track.addEventListener('keydown', (e) => { const k = e.key; const d = k === 'ArrowRight' || k === 'ArrowUp' ? step : k === 'ArrowLeft' || k === 'ArrowDown' ? -step : 0; if (d) { e.preventDefault(); setV(val + d); onChange?.(val); } });
+  const stepBtn = (d, txt) => h('button', { type: 'button', class: 'sr-step', 'aria-label': d > 0 ? 'زيادة' : 'نقص', onclick: () => { setV(val + d); onChange?.(val); } }, txt);
+  out.onclick = async () => { const v = window.prompt(label || 'القيمة', String(val)); if (v != null && v.trim() !== '' && isFinite(+v)) { setV(+v); onChange?.(val); } };
+  const el = h('div', { class: 'sr' + (compact ? ' compact' : '') }, stepBtn(-step, '−'), track, stepBtn(step, '+'), out);
+  render();
+  el.get = () => val; el.set = (v) => { val = snapV(+v); render(); }; el.setSilently = el.set;
+  return el;
+}
 /** labelled slider row */
-export function slider({ label, min, max, step = 1, value, fmt = (v) => v, onInput, id }) {
-  const out = h('output', {}, fmt(value));
-  const inp = h('input', { type: 'range', min, max, step, value, id, oninput: (e) => { out.textContent = fmt(+e.target.value); onInput?.(+e.target.value); } });
-  const row = h('label', { class: 'slider-row' }, h('span', { class: 'lbl' }, label), inp, out);
-  row.input = inp; row.get = () => +inp.value; row.set = (v) => { inp.value = v; out.textContent = fmt(+v); };
+export function slider({ label, min, max, step = 1, value, fmt = (v) => v, onInput, onChange, id }) {
+  const sr = safeRange({ min, max, step, value, fmt, onInput, onChange, label });
+  const row = h('div', { class: 'slider-row', id }, h('span', { class: 'lbl' }, label), sr);
+  row.get = sr.get; row.set = sr.set;
   return row;
 }
 export function segmented(options, value, onChange) {

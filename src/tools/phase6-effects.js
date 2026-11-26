@@ -11,6 +11,7 @@ import { codecSupported, encodeOGG, encodeM4A } from '../export/codecs.js';
 import { encodeWAV } from '../export/wav.js';
 import { sendToInbox } from '../storage/db.js';
 import { bakeFade } from './phase3-level.js';
+import { livePreview } from '../ui/preview.js';
 
 export function normalizeGain(pcm, targetDb = -1) { const pk = peakOf(pcm); return pk > 0 ? Math.pow(10, targetDb / 20) / pk : 1; }
 
@@ -31,9 +32,11 @@ export function setup(app) {
   async function effectDialog(title, note, controls, getSpec, label) {
     const r = app.range(); if (!r) return toast('افتح ملفًا أولًا');
     const info = h('p', { class: 'note' }, `يُطبّق على ${r.kind === 'selection' ? 'الجزء المحدد' : r.kind === 'clip' ? 'المقطع المحدد' : 'المسار كاملًا'} (${(r.b - r.a).toFixed(1)} ث).`);
-    const preview = async () => { const pcm = app.renderRange(r.a, Math.min(r.b, r.a + 10)); const pg = progressDlg('تجهيز المعاينة'); try { app.player.playPCM(await runEffect(getSpec(), pcm)); } finally { pg.close(); } return false; };
-    const ok = await dialog({ title, body: h('div', {}, note ? h('p', { class: 'note' }, note) : null, ...controls, info), actions: [{ label: 'إلغاء', value: false }, { label: '▶ معاينة', value: false, onClick: preview }, { label: 'طبّق', value: true, primary: true }] });
-    app.player.stop(); if (!ok) return;
+    const pv = livePreview(app, { range: r, process: (pcm) => runEffect(getSpec(), pcm) });
+    const body = h('div', {}, note ? h('p', { class: 'note' }, note) : null, ...controls, info, pv);
+    const ok = await dialog({ title, body, onOpen: () => pv.attach(body), actions: [{ label: 'إلغاء', value: false }, { label: 'اعتماد', value: true, primary: true }] });
+    pv.stop();
+    if (!ok) return;
     const spec = getSpec();
     await app.processRange(label || title, (pcm, onP) => runEffect(spec, pcm, onP), { range: r, progressTitle: title });
   }

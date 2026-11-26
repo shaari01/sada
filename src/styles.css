@@ -127,3 +127,64 @@ progress { width: 100%; height: 18px; }
   .transport .seltime { display: none; }
   .viewswitch { padding: 6px; }
 }
+
+/* ===== Compact touch UI (VivaVideo-style), applies to every screen ===== */
+:root { --r: 10px; }
+.topbar { padding: 4px 8px; padding-top: max(4px, env(safe-area-inset-top)); gap: 6px; }
+.brand { font-size: 17px; gap: 6px; } .brand img { width: 26px; height: 26px; }
+.proj-name { padding: 4px 6px; font-size: 15px; }
+.icon-btn { min-width: 40px; min-height: 40px; border: 0; background: transparent; border-radius: 10px; padding: 0 6px; gap: 4px; }
+.icon-btn:hover { background: var(--panel2); }
+.top-actions .lbl, .transport .icon-btn .lbl { display: none; }
+.viewswitch { padding: 4px 8px; gap: 6px; }
+.viewswitch button { min-height: 36px; border-radius: 18px; font-size: 14px; gap: 6px; border: 0; }
+.transport { padding: 2px 8px; gap: 2px; }
+.transport .play { border-radius: 50%; min-width: 44px; min-height: 44px; }
+.transport .time { font-size: 15px; min-width: 6.2em; }
+.transport .seltime { font-size: 12px; }
+.tabs button { min-height: 36px; padding: 0 12px; font-size: 13.5px; border-bottom-width: 2px; }
+.toolbar { gap: 2px; padding: 4px 6px; padding-bottom: max(4px, env(safe-area-inset-bottom)); min-height: 0; }
+.tbtn { width: 64px; min-height: 56px; border: 0; background: transparent; border-radius: 10px; gap: 3px; padding: 4px 2px; }
+.tbtn span { font-size: 11.5px; line-height: 1.2; }
+.tbtn:hover { background: var(--panel2); }
+.tbtn[aria-pressed="true"] { background: transparent; color: var(--accent); border: 0; box-shadow: inset 0 -2px 0 var(--accent); }
+.cards { padding: 4px 8px; gap: 6px; }
+.card { width: 104px; min-height: 58px; border-width: 1px; border-radius: 10px; padding: 4px; }
+.card canvas { width: 96px !important; height: 26px; }
+.trk-h { padding: 3px 6px; }
+.trk-h .nm { min-height: 30px; font-size: 13.5px; }
+.trk-h .ms { min-height: 28px; min-width: 38px; font-size: 12px; border: 0; }
+.trk-h .tn { min-height: 28px; }
+/* dialogs: compact, bottom sheet on phones */
+.dlg header { padding: 6px 10px; } .dlg h2 { font-size: 17px; }
+.dlg-body { padding: 10px 12px; }
+.dlg footer { padding: 8px 12px; }
+.btn { min-height: 42px; padding: 0 16px; border-radius: 10px; font-size: 15px; }
+.seg button { min-height: 38px; border-radius: 19px; font-size: 14px; padding: 0 10px; }
+.chip { min-height: 34px; padding: 0 12px; border-radius: 17px; font-size: 13.5px; }
+.inp, select.inp { min-height: 42px; }
+.note { font-size: 13px; }
+.slider-row { display: grid; grid-template-columns: 7em 1fr; gap: 6px; margin: 6px 0; align-items: center; }
+.slider-row .lbl { font-size: 14px; }
+/* touch-safe slider */
+.sr { display: flex; align-items: center; gap: 4px; min-width: 0; direction: ltr; }
+.sr-step { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel2); font-size: 18px; line-height: 1; cursor: pointer; padding: 0; }
+.sr-track { position: relative; flex: 1; min-width: 60px; height: 32px; touch-action: pan-y; cursor: default; direction: ltr; outline: none; }
+.sr-rail { position: absolute; left: 0; right: 0; top: 14px; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.sr-fill { height: 100%; background: var(--accent); }
+.sr-thumb { position: absolute; top: 5px; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.35); cursor: grab; transition: transform .1s; }
+.sr-track.active .sr-thumb, .sr-track:focus-visible .sr-thumb { transform: scale(1.25); }
+.sr-val { flex: none; min-width: 4.6em; height: 30px; border: 0; background: none; font-variant-numeric: tabular-nums; direction: ltr; font-size: 13.5px; cursor: pointer; color: var(--text); }
+.sr.compact .sr-step { width: 24px; height: 24px; font-size: 15px; }
+.sr.compact .sr-track { height: 26px; } .sr.compact .sr-rail { top: 11px; } .sr.compact .sr-thumb { width: 18px; height: 18px; top: 4px; }
+.sr.compact .sr-val { min-width: 3.6em; font-size: 11.5px; height: 24px; }
+.trk-h .mini { gap: 2px; }
+.preview-bar { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px; border-radius: 10px; background: var(--panel2); flex-wrap: wrap; }
+.preview-btn { display: inline-flex; align-items: center; gap: 6px; }
+.preview-btn.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+@media (max-width: 600px) {
+  .tbtn { width: 60px; min-height: 54px; }
+  .tl-headers, :root { --hdr-w: 132px; } .tl-headers { width: 132px; }
+  .dlg { width: 100vw; max-width: 100vw; margin: auto 0 0 0; border-radius: 16px 16px 0 0; max-height: 88dvh; }
+  .slider-row { grid-template-columns: 1fr; gap: 0; }
+}

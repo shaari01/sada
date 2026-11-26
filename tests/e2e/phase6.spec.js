@@ -11,7 +11,7 @@ test('phase 6: every effect applies with preview', async ({ page }) => {
   for (const [id, label] of [['amplify', 'تضخيم'], ['normalize', 'تطبيع'], ['compressor', 'ضاغط (Compressor)'], ['eq', 'معادل الصوت'], ['echo', 'صدى (Echo)'], ['reverb', 'تردد (Reverb)'], ['denoise', 'إزالة الضوضاء'], ['hum', 'إزالة الطنين']]) {
     await dragSelect(page, 0.1, 0.5);
     await tool(page, id);
-    if (id === 'reverb') { await page.locator('dialog .seg button', { hasText: 'مسجد' }).click(); await page.locator('dialog .btn', { hasText: 'معاينة' }).click(); await page.waitForFunction(() => window.sada.player.playing); }
+    if (id === 'reverb') { await page.locator('dialog .seg button', { hasText: 'مسجد' }).click(); await page.waitForFunction(() => window.sada.player.playing && window.sada.player.preview); await page.screenshot({ path: 'test-results/ui-preview.png' }); }
     await page.locator('dialog .btn.primary').click();
     await page.waitForFunction((l) => window.sada.state.undo.at(-1)?.label === l, label, { timeout: 20000 });
   }
