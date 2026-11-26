@@ -188,3 +188,46 @@ progress { width: 100%; height: 18px; }
   .dlg { width: 100vw; max-width: 100vw; margin: auto 0 0 0; border-radius: 16px 16px 0 0; max-height: 88dvh; }
   .slider-row { grid-template-columns: 1fr; gap: 0; }
 }
+
+/* ===== Samsung Video Editor style: smaller, clearer icons; ✓ / ✗ in panels ===== */
+.tabs { gap: 0; }
+.tabs button { min-height: 46px; padding: 2px 8px; font-size: 11px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-bottom-width: 2px; min-width: 54px; }
+.tabs button .ic { opacity: .75; }
+.tabs button[aria-selected="true"] .ic { opacity: 1; color: var(--accent); }
+.tbtn { width: 58px; min-height: 50px; gap: 2px; }
+.tbtn span { font-size: 11px; }
+.tbtn .ic { stroke-width: 1.8; }
+.dlg footer.two { display: flex; justify-content: space-between; }
+.dlg footer .btn { display: inline-flex; align-items: center; gap: 6px; }
+.dlg footer .btn .ic { flex: none; }
+/* user presets row inside effect dialogs */
+.preset-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 8px; }
+.preset-row .pr-lbl { font-size: 12px; color: var(--muted, #999); }
+.uchip { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 16px; background: var(--panel2); min-height: 32px; }
+.uchip > button { border: 0; background: none; color: inherit; font: inherit; font-size: 13px; cursor: pointer; min-height: 32px; }
+.uchip-main { padding: 0 10px; } .uchip-x { padding: 0 8px 0 4px; display: inline-flex; align-items: center; opacity: .7; }
+button.uchip.add { padding: 0 10px; gap: 4px; color: var(--accent); cursor: pointer; font: inherit; font-size: 13px; }
+/* library panel */
+.lib .seg { margin-bottom: 8px; flex-wrap: wrap; }
+.lib-list { display: flex; flex-direction: column; gap: 4px; }
+.lib-add { display: flex; gap: 6px; margin-bottom: 4px; }
+.lib-row { display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 10px; background: var(--panel2); }
+.lib-row.off { opacity: .55; }
+.lib-nm { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lib-nm b { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-nm small { font-size: 11px; opacity: .7; }
+.lib-play { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--panel); color: inherit; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.lib-play.on { background: var(--accent); color: var(--accent-ink); }
+.lib-b { flex: none; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 48px; min-height: 48px; border: 0; background: none; color: inherit; border-radius: 10px; cursor: pointer; padding: 2px 4px; }
+.lib-b span { font-size: 10.5px; }
+.lib-b:hover { background: var(--panel); }
+.lib-b.danger { color: var(--danger); }
+.lib-add .lib-b { flex-direction: row; gap: 6px; min-height: 40px; padding: 0 12px; background: var(--panel2); border-radius: 20px; }
+.lib-add .lib-b span { font-size: 13px; }
+.lib-add .lib-b.primary { background: var(--accent); color: var(--accent-ink); }
+@media (max-width: 600px) {
+  .tbtn { width: 56px; min-height: 50px; }
+  .tabs button { min-width: 50px; padding: 2px 6px; }
+  .lib-b span { display: none; } .lib-b { min-width: 44px; min-height: 44px; }
+  .lib-add .lib-b span { display: inline; }
+}

@@ -25,7 +25,7 @@ const tl = new Timeline($('#timeline'), {
   getProject: () => state.project, getSource: app.getSource, state, player: app.player,
   onSelect: (sel, live) => { updateSelInfo(); if (!live) renderCardsNow(); },
   onCursor: (t, seek) => { state.cursor = t; if (app.player.playing && !app.player.preview) app.actions.play(t); tl.redrawOverlay(); updateTime(); },
-  onTrackActivate: (id) => { if (state.project.activeTrackId !== id) { state.project.activeTrackId = id; renderHeaders(); tl.redraw(); renderToolbar(); } },
+  onTrackActivate: (id) => { if (state.project.activeTrackId !== id) { state.project.activeTrackId = id; tl.renderHeaders(tl.headers, state.project.tracks, tl.laneH); tl.redraw(); renderToolbar(); } },
   onMarkerTap: (m) => app.actions.markerTap(m),
   onClipMove: (clipId, start, trackId) => app.actions.moveClip?.(clipId, start, trackId),
   onEnvelopeEdit: (trackId, kind, arg, live) => envelopeEdit(trackId, kind, arg, live),
@@ -112,10 +112,12 @@ function updateTime() { timeEl.textContent = fmtTime(app.player.position() ?? st
 function updateSelInfo() { const s = state.selection; selEl.textContent = s && s[1] > s[0] ? `${fmtTime(s[0])} – ${fmtTime(s[1])} (${(s[1] - s[0]).toFixed(2)} ث)` : ''; }
 
 // ---------- tabs & toolbar ----------
+// small icon + short label for each category (Samsung Video Editor style)
+const TAB_ICONS = { edit: 'Scissors', speed: 'Gauge', level: 'Volume2', tracks: 'Layers', rhythm: 'Drum', fx: 'Sparkles', rec: 'Mic', library: 'Library', export: 'Download' };
 let currentTab = 'edit';
 function renderTabs() {
   const t = $('#tabs'); t.innerHTML = '';
-  for (const tab of app.tabs) t.append(h('button', { role: 'tab', 'aria-selected': String(tab.id === currentTab), 'data-tab': tab.id, onclick: () => { currentTab = tab.id; renderTabs(); renderToolbar(); } }, tab.label));
+  for (const tab of app.tabs) t.append(h('button', { role: 'tab', 'aria-selected': String(tab.id === currentTab), 'data-tab': tab.id, onclick: () => { currentTab = tab.id; renderTabs(); renderToolbar(); } }, icon(TAB_ICONS[tab.id] || 'Info', 18), h('span', {}, tab.label)));
 }
 function renderToolbar() {
   const bar = $('#toolbar'); bar.innerHTML = '';

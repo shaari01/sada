@@ -40,6 +40,14 @@ function mixWet(ctx, input, wetNode, mix) {
   const out = ctx.createGain(), dry = ctx.createGain(), wet = ctx.createGain();
   dry.gain.value = 1 - mix * 0.5; wet.gain.value = mix; input.connect(dry); dry.connect(out); wetNode.connect(wet); wet.connect(out); return out;
 }
+/** a user's own impulse response (recorded room) → AudioBuffer, normalised so loud IR files don't blow up */
+export function irBuffer(ctx, pcm) {
+  const n = pcm.channels[0].length, b = ctx.createBuffer(Math.min(2, pcm.channels.length), n, pcm.sampleRate);
+  let e = 0; for (const c of pcm.channels) for (let i = 0; i < n; i++) e += c[i] * c[i];
+  const k = e > 0 ? 1 / Math.sqrt(e / pcm.channels.length) * 0.35 : 1;
+  for (let c = 0; c < b.numberOfChannels; c++) { const d = b.getChannelData(c), s = pcm.channels[c]; for (let i = 0; i < n; i++) d[i] = s[i] * k; }
+  return b;
+}
 /** build a chain(ctx, input) → output for an effect spec */
 export function chainFor(spec) {
   return (ctx, input) => {
@@ -59,7 +67,7 @@ export function chainFor(spec) {
         input.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d);
         return mixWet(ctx, input, lp, spec.mix);
       }
-      case 'reverb': { const cv = ctx.createConvolver(); cv.buffer = makeIR(ctx, REVERBS[spec.preset]); input.connect(cv); return mixWet(ctx, input, cv, spec.mix); }
+      case 'reverb': { const cv = ctx.createConvolver(); cv.buffer = spec.ir ? irBuffer(ctx, spec.ir) : makeIR(ctx, REVERBS[spec.preset] || REVERBS.hall); input.connect(cv); return mixWet(ctx, input, cv, spec.mix); }
       default: return input;
     }
   };

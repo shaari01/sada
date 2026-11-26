@@ -1,11 +1,11 @@
-// Minimal IndexedDB wrapper: projects, sources (PCM), settings.
-const DB_NAME = 'sada-db', VER = 1;
+// Minimal IndexedDB wrapper: projects, sources (PCM), settings, assets (the user's own library).
+const DB_NAME = 'sada-db', VER = 2;
 let dbp = null;
 function open() {
   if (dbp) return dbp;
   dbp = new Promise((res, rej) => {
     const r = indexedDB.open(DB_NAME, VER);
-    r.onupgradeneeded = () => { const d = r.result; for (const s of ['projects', 'sources', 'settings']) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s); };
+    r.onupgradeneeded = () => { const d = r.result; for (const s of ['projects', 'sources', 'settings', 'assets']) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s); };
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   });
   return dbp;

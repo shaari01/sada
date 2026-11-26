@@ -12,7 +12,10 @@ import { encodeWAV } from '../export/wav.js';
 import { sendToInbox } from '../storage/db.js';
 import { bakeFade } from './phase3-level.js';
 import { livePreview } from '../ui/preview.js';
+import { presetRow } from '../ui/presets.js';
+import { listAssets, getAsset, isHidden } from '../storage/assets.js';
 
+export const COMP_PRESETS = { light: { label: 'خفيف', v: [-18, 2, 3] }, mid: { label: 'متوسط', v: [-24, 4, 6] }, strong: { label: 'قوي', v: [-32, 8, 10] } };
 export function normalizeGain(pcm, targetDb = -1) { const pk = peakOf(pcm); return pk > 0 ? Math.pow(10, targetDb / 20) / pk : 1; }
 
 export function setup(app) {
@@ -24,39 +27,56 @@ export function setup(app) {
       case 'reverse': return reversePCM(pcm);
       case 'denoise': { const ch = await runDSP('denoise', { channels: pcm.channels, sampleRate: pcm.sampleRate, strength: spec.strength }, { onProgress: onP }); return { sampleRate: pcm.sampleRate, channels: ch }; }
       case 'hum': { const ch = await runDSP('hum', { channels: pcm.channels, sampleRate: pcm.sampleRate, freq: spec.freq }); return { sampleRate: pcm.sampleRate, channels: ch }; }
+      case 'reverb': if (String(spec.preset).startsWith('u:')) { const a = getAsset(spec.preset.slice(2)); spec = a ? { ...spec, ir: a.pcm } : { ...spec, preset: 'hall' }; } // fallthrough
       default: return processWithChain(pcm, chainFor(spec), { tail: tail(spec) });
     }
   }
   app.runEffect = runEffect;
   /** generic effect dialog with live preview of (up to) the first 10 s */
-  async function effectDialog(title, note, controls, getSpec, label) {
+  /** built-in choices the user has not hidden (never empty) */
+  const visible = (fx, entries) => { const v = entries.filter(([k]) => !isHidden(fx + ':' + k)); return v.length ? v : entries.slice(0, 1); };
+  async function effectDialog(title, note, controls, getSpec, label, { fx, setSpec } = {}) {
     const r = app.range(); if (!r) return toast('افتح ملفًا أولًا');
     const info = h('p', { class: 'note' }, `يُطبّق على ${r.kind === 'selection' ? 'الجزء المحدد' : r.kind === 'clip' ? 'المقطع المحدد' : 'المسار كاملًا'} (${(r.b - r.a).toFixed(1)} ث).`);
     const pv = livePreview(app, { range: r, process: (pcm) => runEffect(getSpec(), pcm) });
-    const body = h('div', {}, note ? h('p', { class: 'note' }, note) : null, ...controls, info, pv);
+    const pr = fx && setSpec ? presetRow(fx, getSpec, setSpec) : null;
+    const body = h('div', {}, note ? h('p', { class: 'note' }, note) : null, pr, ...controls, info, pv);
     const ok = await dialog({ title, body, onOpen: () => pv.attach(body), actions: [{ label: 'إلغاء', value: false }, { label: 'اعتماد', value: true, primary: true }] });
-    pv.stop();
+    pv.stop(); pr?.dispose();
     if (!ok) return;
     const spec = getSpec();
     await app.processRange(label || title, (pcm, onP) => runEffect(spec, pcm, onP), { range: r, progressTitle: title });
   }
-  A.amplify = () => { const s = slider({ label: 'التضخيم', min: -20, max: 20, step: 0.5, value: 6, fmt: (v) => (v > 0 ? '+' : '') + v + ' dB' }); return effectDialog('تضخيم', 'ارفع مستوى الصوت أو اخفضه. (+6 dB ≈ ضعف الارتفاع المسموع تقريبًا)', [s], () => ({ type: 'gain', db: s.get() })); };
-  A.normalize = () => { const s = slider({ label: 'أعلى قمة', min: -12, max: 0, step: 0.5, value: -1, fmt: (v) => v + ' dB' }); return effectDialog('تطبيع', 'يرفع الصوت حتى تصل أعلى قمة إلى المستوى المحدد دون تشويه.', [s], () => ({ type: 'normalize', db: s.get() })); };
+  A.amplify = () => { const s = slider({ label: 'التضخيم', min: -20, max: 20, step: 0.5, value: 6, fmt: (v) => (v > 0 ? '+' : '') + v + ' dB' }); return effectDialog('تضخيم', 'ارفع مستوى الصوت أو اخفضه. (+6 dB ≈ ضعف الارتفاع المسموع تقريبًا)', [s], () => ({ type: 'gain', db: s.get() }), null, { fx: 'gain', setSpec: (p) => s.set(p.db) }); };
+  A.normalize = () => { const s = slider({ label: 'أعلى قمة', min: -12, max: 0, step: 0.5, value: -1, fmt: (v) => v + ' dB' }); return effectDialog('تطبيع', 'يرفع الصوت حتى تصل أعلى قمة إلى المستوى المحدد دون تشويه.', [s], () => ({ type: 'normalize', db: s.get() }), null, { fx: 'normalize', setSpec: (p) => s.set(p.db) }); };
   A.compressor = () => {
-    let pre = 'mid'; const P = { light: [-18, 2, 3], mid: [-24, 4, 6], strong: [-32, 8, 10] };
+    let pre = 'mid'; const P = Object.fromEntries(Object.entries(COMP_PRESETS).map(([k, v]) => [k, v.v]));
     const th = slider({ label: 'العتبة', min: -60, max: 0, step: 1, value: -24, fmt: (v) => v + ' dB' }), ra = slider({ label: 'النسبة', min: 1, max: 20, step: 0.5, value: 4, fmt: (v) => v + ':1' }), mk = slider({ label: 'تعويض المستوى', min: 0, max: 20, step: 0.5, value: 6, fmt: (v) => '+' + v + ' dB' });
-    const seg = segmented([{ value: 'light', label: 'خفيف' }, { value: 'mid', label: 'متوسط' }, { value: 'strong', label: 'قوي' }], pre, (v) => { pre = v; th.set(P[v][0]); ra.set(P[v][1]); mk.set(P[v][2]); });
-    return effectDialog('ضاغط (Compressor)', 'يقرّب الأصوات العالية والمنخفضة من بعضها فيصبح الصوت أوضح وأثبت.', [seg, th, ra, mk], () => ({ type: 'comp', threshold: th.get(), ratio: ra.get(), makeup: mk.get() }));
+    const opts = visible('comp', Object.entries(COMP_PRESETS)); if (!opts.some(([k]) => k === pre)) pre = opts[0][0];
+    const use = (v) => { th.set(P[v][0]); ra.set(P[v][1]); mk.set(P[v][2]); }; use(pre);
+    const seg = segmented(opts.map(([k, v]) => ({ value: k, label: v.label })), pre, (v) => { pre = v; use(v); });
+    return effectDialog('ضاغط (Compressor)', 'يقرّب الأصوات العالية والمنخفضة من بعضها فيصبح الصوت أوضح وأثبت.', [seg, th, ra, mk], () => ({ type: 'comp', threshold: th.get(), ratio: ra.get(), makeup: mk.get() }), null,
+      { fx: 'comp', setSpec: (p) => { th.set(p.threshold); ra.set(p.ratio); mk.set(p.makeup); seg.set(null); } });
   };
   A.eq = () => {
     let pre = 'clear'; const bands = EQ_BANDS.map((f) => slider({ label: f >= 1000 ? f / 1000 + ' ك.هرتز' : f + ' هرتز', min: -12, max: 12, step: 0.5, value: 0, fmt: (v) => (v > 0 ? '+' : '') + v }));
     const custom = h('div', { hidden: true }, ...bands);
-    const seg = segmented([...Object.entries(EQ_PRESETS).map(([k, v]) => ({ value: k, label: v.label })), { value: 'custom', label: 'يدوي' }], pre, (v) => { pre = v; custom.hidden = v !== 'custom'; });
-    return effectDialog('معادل الصوت', null, [seg, custom], () => ({ type: 'eq', preset: pre, gains: bands.map((b) => b.get()) }), 'معادل الصوت');
+    const opts = visible('eq', Object.entries(EQ_PRESETS)); if (!opts.some(([k]) => k === pre)) pre = opts[0][0];
+    const seg = segmented([...opts.map(([k, v]) => ({ value: k, label: v.label })), { value: 'custom', label: 'يدوي' }], pre, (v) => { pre = v; custom.hidden = v !== 'custom'; });
+    return effectDialog('معادل الصوت', null, [seg, custom], () => ({ type: 'eq', preset: pre, gains: bands.map((b) => b.get()) }), 'معادل الصوت',
+      { fx: 'eq', setSpec: (p) => { pre = EQ_PRESETS[p.preset] || p.preset === 'custom' ? p.preset : 'custom'; (p.gains || []).forEach((g, i) => bands[i]?.set(g)); seg.set(pre); custom.hidden = pre !== 'custom'; } });
   };
-  A.echo = () => { const t = slider({ label: 'زمن الصدى', min: 0.05, max: 1.5, step: 0.01, value: 0.35, fmt: (v) => v.toFixed(2) + ' ث' }), fb = slider({ label: 'التكرار', min: 0, max: 0.85, step: 0.01, value: 0.4, fmt: (v) => Math.round(v * 100) + '%' }), mx = slider({ label: 'قوة الصدى', min: 0, max: 1, step: 0.01, value: 0.4, fmt: (v) => Math.round(v * 100) + '%' }); return effectDialog('صدى (Echo)', 'تكرار الصوت بعد زمن محدد.', [t, fb, mx], () => ({ type: 'echo', time: t.get(), feedback: fb.get(), mix: mx.get() })); };
-  A.reverb = () => { let pre = 'hall'; const mx = slider({ label: 'قوة التردد', min: 0, max: 1, step: 0.01, value: 0.35, fmt: (v) => Math.round(v * 100) + '%' }); const seg = segmented(Object.entries(REVERBS).map(([k, v]) => ({ value: k, label: v.label })), pre, (v) => (pre = v)); return effectDialog('تردد (Reverb)', 'يُشعر بأن الصوت في مكان: غرفة، أو قاعة، أو مسجد، أو فضاء.', [seg, mx], () => ({ type: 'reverb', preset: pre, mix: mx.get() })); };
-  A.denoise = () => { const s = slider({ label: 'القوة', min: 0.2, max: 2, step: 0.1, value: 1, fmt: (v) => v.toFixed(1) }); return effectDialog('إزالة الضوضاء', 'يتعرف على الضوضاء الثابتة (مروحة، هسهسة) من أهدأ أجزاء الصوت ويخفضها. ارفع القوة بحذر حتى لا يصبح الصوت «معدنيًا».', [s], () => ({ type: 'denoise', strength: s.get() })); };
+  A.echo = () => { const t = slider({ label: 'زمن الصدى', min: 0.05, max: 1.5, step: 0.01, value: 0.35, fmt: (v) => v.toFixed(2) + ' ث' }), fb = slider({ label: 'التكرار', min: 0, max: 0.85, step: 0.01, value: 0.4, fmt: (v) => Math.round(v * 100) + '%' }), mx = slider({ label: 'قوة الصدى', min: 0, max: 1, step: 0.01, value: 0.4, fmt: (v) => Math.round(v * 100) + '%' }); return effectDialog('صدى (Echo)', 'تكرار الصوت بعد زمن محدد.', [t, fb, mx], () => ({ type: 'echo', time: t.get(), feedback: fb.get(), mix: mx.get() }), null, { fx: 'echo', setSpec: (p) => { t.set(p.time); fb.set(p.feedback); mx.set(p.mix); } }); };
+  A.reverb = () => {
+    let pre = 'hall'; const mx = slider({ label: 'قوة التردد', min: 0, max: 1, step: 0.01, value: 0.35, fmt: (v) => Math.round(v * 100) + '%' });
+    const mine = listAssets('ir').map((a) => ['u:' + a.id, { label: a.name }]);
+    const opts = [...(mine.length ? Object.entries(REVERBS).filter(([k]) => !isHidden('reverb:' + k)) : visible('reverb', Object.entries(REVERBS))), ...mine];
+    if (!opts.some(([k]) => k === pre)) pre = opts[0][0];
+    const seg = segmented(opts.map(([k, v]) => ({ value: k, label: v.label })), pre, (v) => (pre = v));
+    return effectDialog('تردد (Reverb)', 'يُشعر بأن الصوت في مكان: غرفة، أو قاعة، أو مسجد، أو فضاء. ويمكنك إضافة غرفك الخاصة من «المكتبة».', [seg, mx], () => ({ type: 'reverb', preset: pre, mix: mx.get() }), null,
+      { fx: 'reverb', setSpec: (p) => { if (opts.some(([k]) => k === p.preset)) { pre = p.preset; seg.set(pre); } mx.set(p.mix); } });
+  };
+  A.denoise = () => { const s = slider({ label: 'القوة', min: 0.2, max: 2, step: 0.1, value: 1, fmt: (v) => v.toFixed(1) }); return effectDialog('إزالة الضوضاء', 'يتعرف على الضوضاء الثابتة (مروحة، هسهسة) من أهدأ أجزاء الصوت ويخفضها. ارفع القوة بحذر حتى لا يصبح الصوت «معدنيًا».', [s], () => ({ type: 'denoise', strength: s.get() }), null, { fx: 'denoise', setSpec: (p) => s.set(p.strength) }); };
   A.hum = () => { let f = 'auto'; const seg = segmented([{ value: 'auto', label: 'تلقائي' }, { value: 60, label: '60 هرتز (السعودية)' }, { value: 50, label: '50 هرتز' }], f, (v) => (f = v)); return effectDialog('إزالة الطنين', 'يزيل طنين الكهرباء وتوافقياته.', [seg], () => ({ type: 'hum', freq: f })); };
   A.reverse = async () => { const r = app.range(); if (!r) return; await app.processRange('عكس', (pcm) => reversePCM(pcm), { range: r }); };
 

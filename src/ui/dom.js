@@ -14,7 +14,7 @@ export function h(tag, attrs = {}, ...kids) {
 }
 /** big touch button with icon + Arabic label */
 export function tbtn(iconName, label, onClick, extra = {}) {
-  return h('button', { class: 'tbtn ' + (extra.class || ''), type: 'button', title: extra.title || label, 'data-action': extra.id || null, onclick: onClick, 'aria-pressed': extra.pressed != null ? String(!!extra.pressed) : null }, icon(iconName, extra.size || 22), h('span', {}, label));
+  return h('button', { class: 'tbtn ' + (extra.class || ''), type: 'button', title: extra.title || label, 'data-action': extra.id || null, onclick: onClick, 'aria-pressed': extra.pressed != null ? String(!!extra.pressed) : null }, icon(iconName, extra.size || 20), h('span', {}, label));
 }
 export function fmtTime(t, precise = true) {
   if (t == null || !isFinite(t)) t = 0;
@@ -33,9 +33,9 @@ export function dialog({ title, body, actions = [{ label: 'تم', value: true, p
     const close = (v) => { d.close(); d.remove(); resolve(v); };
     const content = typeof body === 'string' ? h('div', { html: body }) : body;
     d.append(
-      h('header', {}, h('h2', {}, title), h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'إغلاق', onclick: () => close(null) }, icon('X', 26))),
+      h('header', {}, h('h2', {}, title), h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'إغلاق', onclick: () => close(null) }, icon('X', 22))),
       h('div', { class: 'dlg-body' }, content),
-      h('footer', {}, ...actions.map((a) => h('button', { type: 'button', class: 'btn' + (a.primary ? ' primary' : '') + (a.danger ? ' danger' : ''), 'data-value': String(a.value), onclick: async () => { if (a.onClick) { const keep = await a.onClick(d); if (keep === false) return; } close(typeof a.value === 'function' ? a.value(d) : a.value); } }, a.label))),
+      h('footer', { class: actions.length === 2 ? 'two' : '' }, ...actions.map((a) => h('button', { type: 'button', class: 'btn' + (a.primary ? ' primary' : '') + (a.danger ? ' danger' : ''), 'data-value': String(a.value), onclick: async () => { if (a.onClick) { const keep = await a.onClick(d); if (keep === false) return; } close(typeof a.value === 'function' ? a.value(d) : a.value); } }, a.primary ? icon('Check', 20) : (a.value === false || a.value === null) && !a.danger ? icon('X', 20) : null, a.label))),
     );
     d.addEventListener('cancel', (e) => { e.preventDefault(); close(null); });
     document.body.append(d); d.showModal(); onOpen?.(d);
@@ -89,8 +89,8 @@ export function slider({ label, min, max, step = 1, value, fmt = (v) => v, onInp
 }
 export function segmented(options, value, onChange) {
   const wrap = h('div', { class: 'seg', role: 'radiogroup' });
-  const render = () => { wrap.innerHTML = ''; for (const o of options) wrap.append(h('button', { type: 'button', role: 'radio', 'aria-checked': String(o.value === value), class: o.value === value ? 'on' : '', onclick: () => { value = o.value; render(); onChange?.(value); } }, o.icon ? icon(o.icon, 22) : null, o.label)); };
-  render(); wrap.get = () => value; return wrap;
+  const render = () => { wrap.innerHTML = ''; for (const o of options) wrap.append(h('button', { type: 'button', role: 'radio', 'aria-checked': String(o.value === value), class: o.value === value ? 'on' : '', onclick: () => { value = o.value; render(); onChange?.(value); } }, o.icon ? icon(o.icon, 18) : null, o.label)); };
+  render(); wrap.get = () => value; wrap.set = (v) => { value = v; render(); }; return wrap;
 }
 export function progressDlg(title) {
   const bar = h('progress', { max: 1, value: 0 }); const txt = h('p', {}, 'جارٍ العمل…');
